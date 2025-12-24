@@ -1,6 +1,6 @@
 const { addonBuilder } = require("stremio-addon-sdk");
 const { GoogleGenerativeAI, GoogleSearch } = require("@google/generative-ai");
-const fetch = require("node-fetch").default;
+const fetch = require("./utils/fetch");
 const logger = require("./utils/logger");
 const path = require("path");
 const { decryptConfig } = require("./utils/crypto");

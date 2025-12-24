@@ -11,6 +11,13 @@ function getEnv(name, fallback) {
   return v === undefined || v === null || v === "" ? fallback : v;
 }
 
+function getArgValue(name) {
+  const idx = process.argv.indexOf(name);
+  if (idx === -1) return null;
+  const v = process.argv[idx + 1];
+  return v && !v.startsWith("--") ? v : null;
+}
+
 async function waitForHttpOk(url, timeoutMs) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -56,7 +63,8 @@ async function postJson(url, body) {
 async function main() {
   const mockPort = Number(getEnv("MOCK_PORT", "8787"));
   const addonPort = Number(getEnv("ADDON_PORT", "7000"));
-  const aiProvider = getEnv("AI_PROVIDER", "openai-compat");
+  const aiProvider =
+    getArgValue("--provider") || getEnv("AI_PROVIDER", "openai-compat");
 
   const mockBase = `http://127.0.0.1:${mockPort}`;
   const tmdbBase = `${mockBase}/3`;

@@ -75,6 +75,10 @@ Gemini provider (mocked through the same local OpenAI-compatible mock endpoint):
 
 Note: smoke scripts require dependencies installed (`npm install`) and the ability to bind to local ports.
 
+## Node version
+
+This project targets Node.js 22+.
+
 ## Customizing Your Homepage
 
 One of the most powerful features of this addon is the ability to create your own recommendation rows directly on the Stremio homepage. In the "Custom Homepage Catalogs" field within the addon's advanced settings, you can define multiple, comma-separated catalogs.

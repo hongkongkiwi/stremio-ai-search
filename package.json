@@ -12,7 +12,7 @@
     "smoke:catalog": "node scripts/smoke-catalog.js",
     "smoke:similar": "node scripts/smoke-similar.js",
     "smoke:all:mock": "node scripts/smoke-all-mock.js",
-    "smoke:all:mock:gemini": "AI_PROVIDER=gemini node scripts/smoke-all-mock.js"
+    "smoke:all:mock:gemini": "node scripts/smoke-all-mock.js --provider gemini"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -21,7 +21,6 @@
     "express": "^4.18.x",
     "express-rate-limit": "^7.1.5",
     "lru-cache": "^10.0.1",
-    "node-fetch": "^2.7.x",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
     "stremio-addon-sdk": "^1.6.10"
@@ -30,7 +29,7 @@
     "jsdom": "^22.1.0"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=22.0.0"
   },
   "author": "ITCON",
   "license": "MIT",

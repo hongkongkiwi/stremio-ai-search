@@ -3,7 +3,9 @@ const path = require("path");
 
 function freshRequireAiProviderWithFetch(fetchImpl) {
   const modulePath = path.join(process.cwd(), "utils", "aiProvider.js");
+  const fetchPath = path.join(process.cwd(), "utils", "fetch.js");
   delete require.cache[require.resolve(modulePath)];
+  delete require.cache[require.resolve(fetchPath)];
   const previousFetch = global.fetch;
   global.fetch = fetchImpl;
   const mod = require(modulePath);

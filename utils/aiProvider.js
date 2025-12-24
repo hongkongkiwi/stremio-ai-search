@@ -1,15 +1,4 @@
-let fetchFn = globalThis.fetch;
-if (!fetchFn) {
-  try {
-    const nodeFetch = require("node-fetch");
-    fetchFn = nodeFetch.default || nodeFetch;
-  } catch {
-    // If neither global fetch nor node-fetch exists, callers will get a clear error at runtime.
-    fetchFn = null;
-  }
-}
-
-const fetch = fetchFn ? fetchFn.bind(globalThis) : null;
+const fetch = require("./fetch");
 
 function normalizeProviderName(provider) {
   if (!provider) return null;
@@ -136,11 +125,6 @@ function createAiTextGenerator(aiProviderConfig) {
         // Only active when GEMINI_MOCK_BASE_URL is set.
         const mockBaseUrl = (process.env.GEMINI_MOCK_BASE_URL || "").trim();
         if (mockBaseUrl) {
-          if (!fetch) {
-            throw new Error(
-              "Fetch API is not available (need Node 18+ or install node-fetch)"
-            );
-          }
           const url = getOpenAIChatCompletionsUrl(mockBaseUrl);
           const response = await fetch(url, {
             method: "POST",
@@ -190,12 +174,6 @@ function createAiTextGenerator(aiProviderConfig) {
       provider: "openai-compat",
       model: aiProviderConfig.model,
       async generateText(prompt) {
-        if (!fetch) {
-          throw new Error(
-            "Fetch API is not available (need Node 18+ or install node-fetch)"
-          );
-        }
-
         const timeoutMs =
           typeof aiProviderConfig.timeoutMs === "number" && aiProviderConfig.timeoutMs > 0
             ? aiProviderConfig.timeoutMs
