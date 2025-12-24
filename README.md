@@ -40,6 +40,7 @@ In the configuration page you can choose an AI provider:
 - **OpenAI-compatible**: works with OpenAI / OpenRouter / Z.ai / other OpenAI-compatible APIs
   - Base URL examples: `https://api.openai.com`, `https://openrouter.ai/api`
   - Model examples: `gpt-4o-mini`, `openai/gpt-4o-mini` (OpenRouter-style)
+  - Optional extra headers (JSON): `{"HTTP-Referer":"https://example.com","X-Title":"Stremio AI Search"}`
 
 ## Customizing Your Homepage
 

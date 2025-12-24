@@ -36,6 +36,34 @@ function getOpenAIChatCompletionsUrl(baseUrl) {
   return `${raw}/v1/chat/completions`;
 }
 
+function parseOptionalJsonObject(text) {
+  if (!text) return null;
+  const raw = String(text).trim();
+  if (!raw) return null;
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Extra headers must be a JSON object");
+  }
+  return parsed;
+}
+
+function buildExtraHeaders(extraHeaders) {
+  if (!extraHeaders) return {};
+
+  const forbidden = new Set(["authorization", "content-type", "content-length", "host"]);
+  const headers = {};
+
+  for (const [key, value] of Object.entries(extraHeaders)) {
+    const headerName = String(key).trim();
+    if (!headerName) continue;
+    if (forbidden.has(headerName.toLowerCase())) continue;
+    if (value === undefined || value === null) continue;
+    headers[headerName] = String(value);
+  }
+
+  return headers;
+}
+
 function getAiProviderConfigFromConfig(configData = {}) {
   const provider = normalizeProviderName(configData.AiProvider);
 
@@ -45,6 +73,8 @@ function getAiProviderConfigFromConfig(configData = {}) {
       apiKey: (configData.OpenAICompatApiKey || "").trim(),
       baseUrl: (configData.OpenAICompatBaseUrl || "").trim(),
       model: (configData.OpenAICompatModel || "gpt-4o-mini").trim(),
+      extraHeaders: (configData.OpenAICompatExtraHeaders || "").trim(),
+      timeoutMs: Number(configData.OpenAICompatTimeoutMs) || undefined,
     };
   }
 
@@ -68,6 +98,8 @@ function getAiProviderConfigFromConfig(configData = {}) {
       apiKey: String(configData.OpenAICompatApiKey).trim(),
       baseUrl: (configData.OpenAICompatBaseUrl || "").trim(),
       model: (configData.OpenAICompatModel || "gpt-4o-mini").trim(),
+      extraHeaders: (configData.OpenAICompatExtraHeaders || "").trim(),
+      timeoutMs: Number(configData.OpenAICompatTimeoutMs) || undefined,
     };
   }
 
@@ -107,19 +139,53 @@ function createAiTextGenerator(aiProviderConfig) {
             "Fetch API is not available (need Node 18+ or install node-fetch)"
           );
         }
+
+        const timeoutMs =
+          typeof aiProviderConfig.timeoutMs === "number" && aiProviderConfig.timeoutMs > 0
+            ? aiProviderConfig.timeoutMs
+            : 30000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        let extraHeadersObj;
+        try {
+          extraHeadersObj = parseOptionalJsonObject(aiProviderConfig.extraHeaders);
+        } catch (error) {
+          const parseError = new Error(`Invalid extra headers JSON: ${error.message}`);
+          parseError.status = 400;
+          throw parseError;
+        }
+
         const url = getOpenAIChatCompletionsUrl(aiProviderConfig.baseUrl);
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${aiProviderConfig.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: aiProviderConfig.model,
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.2,
-          }),
-        });
+        let response;
+        try {
+          response = await fetch(url, {
+            method: "POST",
+            signal: controller.signal,
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${aiProviderConfig.apiKey}`,
+              ...buildExtraHeaders(extraHeadersObj),
+            },
+            body: JSON.stringify({
+              model: aiProviderConfig.model,
+              messages: [{ role: "user", content: prompt }],
+              temperature: 0.2,
+              max_tokens: 800,
+            }),
+          });
+        } catch (error) {
+          if (error && error.name === "AbortError") {
+            const timeoutError = new Error(
+              `OpenAI-compatible API request timed out after ${timeoutMs}ms`
+            );
+            timeoutError.status = 504;
+            throw timeoutError;
+          }
+          throw error;
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         if (!response.ok) {
           const errorText = await response.text().catch(() => "");

@@ -2804,7 +2804,7 @@ const catalogHandler = async function (args, req) {
       traktAccessTokenLength: configData.TraktAccessToken?.length || 0,
     });
 
-    const geminiModel = aiProviderConfig.model;
+    const aiModel = aiProviderConfig.model;
     const language = configData.TmdbLanguage || "en-US";
 
     if (!aiApiKey || aiApiKey.length < 10) {
@@ -2851,7 +2851,7 @@ const catalogHandler = async function (args, req) {
         enableAiCache: enableAiCache,
         enableRpdb: enableRpdb,
         includeAdult: includeAdult,
-        aiModel: geminiModel,
+        aiModel: aiModel,
         language: language,
         hasTraktClientId: !!DEFAULT_TRAKT_CLIENT_ID,
         hasTraktAccessToken: !!configData.TraktAccessToken,
@@ -3075,7 +3075,7 @@ const catalogHandler = async function (args, req) {
         cacheKey,
         query: searchQuery,
         type,
-        model: geminiModel,
+        model: aiModel,
         cachedAt: new Date(cached.timestamp).toISOString(),
         age: `${Math.round((Date.now() - cached.timestamp) / 1000)}s`,
         responseTime: `${Date.now() - startTime}ms`,
@@ -3117,7 +3117,7 @@ const catalogHandler = async function (args, req) {
           logger.error("AI returned no valid recommendations", { 
             query: searchQuery, 
             type: type,
-            model: geminiModel,
+            model: aiModel,
             responseText: text
           });
           const errorMeta = createErrorMeta('No Results Found', 'The AI could not find any recommendations for your query. Please try rephrasing your search.');
@@ -3504,7 +3504,7 @@ const catalogHandler = async function (args, req) {
 
       logger.info("Making AI API call", {
         provider: aiClient.provider,
-        model: geminiModel,
+        model: aiModel,
         query: searchQuery,
         type,
         prompt: promptText,

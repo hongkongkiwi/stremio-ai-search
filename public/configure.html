@@ -629,6 +629,23 @@
               <code>https://openrouter.ai/api/v1</code>
             </div>
           </div>
+
+          <div class="form-group">
+            <label class="form-label" for="openaiCompatExtraHeaders"
+              >Extra Headers (Optional)</label
+            >
+            <textarea
+              id="openaiCompatExtraHeaders"
+              class="form-textarea"
+              placeholder='JSON object, e.g. {"HTTP-Referer":"https://example.com","X-Title":"Stremio AI Search"}'
+              rows="3"
+            ></textarea>
+            <div class="help-text">
+              Optional JSON headers to send with requests (some providers like
+              OpenRouter recommend <code>HTTP-Referer</code> and
+              <code>X-Title</code>). Don’t include <code>Authorization</code>.
+            </div>
+          </div>
         </div>
 
         <div class="form-group">
@@ -1171,6 +1188,7 @@
           "openaiCompatApiKey",
           "openaiCompatModel",
           "openaiCompatBaseUrl",
+          "openaiCompatExtraHeaders",
           "tmdbKey",
           "rpdbKey",
           "fanartKey",
@@ -1205,6 +1223,9 @@
         const openaiCompatBaseUrl = document
           .getElementById("openaiCompatBaseUrl")
           .value.trim();
+        const openaiCompatExtraHeaders = document
+          .getElementById("openaiCompatExtraHeaders")
+          .value.trim();
         const tmdbKey = document.getElementById("tmdbKey").value.trim();
         
         // Basic validation
@@ -1236,6 +1257,7 @@
             openaiCompatApiKey,
             openaiCompatModel,
             openaiCompatBaseUrl,
+            openaiCompatExtraHeaders,
             tmdbKey,
           });
           if (!isValid) return null;
@@ -1265,6 +1287,7 @@
             configData.OpenAICompatApiKey = openaiCompatApiKey;
             configData.OpenAICompatModel = openaiCompatModel;
             if (openaiCompatBaseUrl) configData.OpenAICompatBaseUrl = openaiCompatBaseUrl;
+            if (openaiCompatExtraHeaders) configData.OpenAICompatExtraHeaders = openaiCompatExtraHeaders;
           }
 
           // Add conditional properties
@@ -1331,6 +1354,7 @@
         openaiCompatApiKey,
         openaiCompatModel,
         openaiCompatBaseUrl,
+        openaiCompatExtraHeaders,
         tmdbKey,
       }) {
         const errorDiv = document.getElementById("error");
@@ -1354,6 +1378,7 @@
               OpenAICompatApiKey: openaiCompatApiKey,
               OpenAICompatModel: openaiCompatModel,
               OpenAICompatBaseUrl: openaiCompatBaseUrl,
+              OpenAICompatExtraHeaders: openaiCompatExtraHeaders,
               TmdbApiKey: tmdbKey,
               FanartApiKey: fanartKey,
               TraktAccessToken: traktAccessToken,
@@ -1456,6 +1481,9 @@
         document.getElementById("manual-url").style.display = "none";
       });
       document.getElementById("openaiCompatBaseUrl").addEventListener("input", () => {
+        document.getElementById("manual-url").style.display = "none";
+      });
+      document.getElementById("openaiCompatExtraHeaders").addEventListener("input", () => {
         document.getElementById("manual-url").style.display = "none";
       });
       document.getElementById("tmdbKey").addEventListener("input", () => {
@@ -1600,6 +1628,9 @@
               if (config.OpenAICompatBaseUrl)
                 document.getElementById("openaiCompatBaseUrl").value =
                   config.OpenAICompatBaseUrl;
+              if (config.OpenAICompatExtraHeaders)
+                document.getElementById("openaiCompatExtraHeaders").value =
+                  config.OpenAICompatExtraHeaders;
               if (config.TmdbApiKey)
                 document.getElementById("tmdbKey").value = config.TmdbApiKey;
               if (config.RpdbApiKey) {
@@ -1674,7 +1705,6 @@
                 config.EnableAiCache !== undefined ||
                 config.TraktAccessToken ||
                 config.GeminiModel ||
-                config.OpenAICompatModel ||
                 config.EnableRpdb // Check the new flag too
               ) {
                 document.getElementById("showAdvancedOptions").checked = true;
