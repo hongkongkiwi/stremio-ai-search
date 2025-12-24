@@ -1244,6 +1244,13 @@
           .getElementById("openaiCompatExtraHeaders")
           .value.trim();
         const tmdbKey = document.getElementById("tmdbKey").value.trim();
+        const aiTemperatureRaw = document
+          .getElementById("aiTemperature")
+          .value.trim();
+        const aiTemperatureParsed = parseFloat(aiTemperatureRaw);
+        const aiTemperature = Number.isFinite(aiTemperatureParsed)
+          ? Math.max(0, Math.min(1, aiTemperatureParsed))
+          : 0.2;
         
         // Basic validation
         if (aiProvider === "gemini") {
@@ -1275,6 +1282,7 @@
             openaiCompatModel,
             openaiCompatBaseUrl,
             openaiCompatExtraHeaders,
+            aiTemperature,
             tmdbKey,
           });
           if (!isValid) return null;
@@ -1289,7 +1297,7 @@
             RpdbApiKey: document.getElementById("rpdbKey").value.trim(),
             FanartApiKey: document.getElementById("fanartKey").value.trim(),
             NumResults: parseInt(document.getElementById("numResults").value.trim()) || 20,
-            AiTemperature: parseFloat(document.getElementById("aiTemperature").value.trim()) || 0.2,
+            AiTemperature: aiTemperature,
             EnableAiCache: document.getElementById("enableAiCache").checked,
             TmdbLanguage: document.getElementById("tmdbLanguage").value,
             EnableRpdb: document.getElementById("enableRpdbPosters").checked,
@@ -1373,6 +1381,7 @@
         openaiCompatModel,
         openaiCompatBaseUrl,
         openaiCompatExtraHeaders,
+        aiTemperature,
         tmdbKey,
       }) {
         const errorDiv = document.getElementById("error");
@@ -1397,7 +1406,7 @@
               OpenAICompatModel: openaiCompatModel,
               OpenAICompatBaseUrl: openaiCompatBaseUrl,
               OpenAICompatExtraHeaders: openaiCompatExtraHeaders,
-              AiTemperature: parseFloat(document.getElementById("aiTemperature").value.trim()) || 0.2,
+              AiTemperature: typeof aiTemperature === "number" ? aiTemperature : 0.2,
               TmdbApiKey: tmdbKey,
               FanartApiKey: fanartKey,
               TraktAccessToken: traktAccessToken,
