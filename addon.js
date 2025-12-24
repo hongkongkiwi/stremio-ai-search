@@ -9,7 +9,11 @@ const {
   createAiTextGenerator,
   getAiProviderConfigFromConfig,
 } = require("./utils/aiProvider");
-const TMDB_API_BASE = "https://api.themoviedb.org/3";
+const TMDB_API_BASE =
+  (process.env.TMDB_API_BASE || "https://api.themoviedb.org/3").replace(
+    /\/+$/,
+    ""
+  );
 const TMDB_CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 day cache for TMDB
 const TMDB_DISCOVER_CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 day cache for TMDB discover (was 12 hours)
 const AI_CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 day cache for AI

@@ -55,7 +55,12 @@ async function validateTmdbApiKey(tmdbApiKey, deps = {}) {
   }
 
   try {
-    const tmdbUrl = `https://api.themoviedb.org/3/configuration?api_key=${tmdbApiKey}`;
+    const base =
+      (process.env.TMDB_API_BASE || "https://api.themoviedb.org/3").replace(
+        /\/+$/,
+        ""
+      );
+    const tmdbUrl = `${base}/configuration?api_key=${tmdbApiKey}`;
     const tmdbResponse = await fetchFn(tmdbUrl);
     if (tmdbResponse && tmdbResponse.ok) {
       result.tmdb = true;
@@ -73,4 +78,3 @@ module.exports = {
   validateAiProvider,
   validateTmdbApiKey,
 };
-

@@ -7,7 +7,10 @@
     "start": "node server.js",
     "start:dev": "ENABLE_LOGGING=true node server.js",
     "test": "node tests/run.js",
-    "smoke:validate": "node scripts/smoke-validate.js"
+    "smoke:validate": "node scripts/smoke-validate.js",
+    "mock:api": "node scripts/mock-api-server.js",
+    "smoke:catalog": "node scripts/smoke-catalog.js",
+    "smoke:similar": "node scripts/smoke-similar.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

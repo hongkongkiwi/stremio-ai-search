@@ -45,6 +45,27 @@ In the configuration page you can choose an AI provider:
 Advanced option:
 - **AI Temperature**: controls randomness (lower is more deterministic; default `0.2`)
 
+## Testing (Optional)
+
+This repo includes lightweight unit tests (`npm test`) and optional smoke scripts that can run against a local server.
+
+### Unit tests
+- `npm test`
+
+### Mock APIs for smoke tests (recommended)
+Run a local mock server that emulates:
+- OpenAI-compatible `POST /v1/chat/completions`
+- TMDB `GET /3/...`
+
+Start the mock server:
+- `npm run mock:api`
+
+Then run the addon server pointing TMDB + OpenAI-compat at the mock:
+- `TMDB_API_BASE=http://127.0.0.1:8787/3 npm run start:dev`
+
+Smoke validate against the running addon (OpenAI-compatible):
+- `BASE_URL=http://127.0.0.1:7000 AI_PROVIDER=openai-compat OPENAI_COMPAT_API_KEY=mock OPENAI_COMPAT_MODEL=mock OPENAI_COMPAT_BASE_URL=http://127.0.0.1:8787 TMDB_API_KEY=mock npm run smoke:validate`
+
 ## Customizing Your Homepage
 
 One of the most powerful features of this addon is the ability to create your own recommendation rows directly on the Stremio homepage. In the "Custom Homepage Catalogs" field within the addon's advanced settings, you can define multiple, comma-separated catalogs.
