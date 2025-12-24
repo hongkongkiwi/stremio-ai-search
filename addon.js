@@ -9,6 +9,7 @@ const {
   createAiTextGenerator,
   getAiProviderConfigFromConfig,
 } = require("./utils/aiProvider");
+const { getMcpContext } = require("./utils/mcp");
 const TMDB_API_BASE =
   (process.env.TMDB_API_BASE || "https://api.themoviedb.org/3").replace(
     /\/+$/,
@@ -3502,6 +3503,24 @@ const catalogHandler = async function (args, req) {
             `- Match mood/style: ${genreCriteria.mood.join(", ")}`
           );
         }
+      }
+
+      // Optional MCP augmentation (server-side only)
+      try {
+        const mcpContext = await getMcpContext({
+          query: searchQuery,
+          type,
+        });
+        if (mcpContext) {
+          promptText.push(
+            "",
+            "MCP CONTEXT (JSON):",
+            mcpContext,
+            ""
+          );
+        }
+      } catch (error) {
+        logger.warn("Failed to fetch MCP context", { error: error.message });
       }
 
       promptText = promptText.join("\n");
