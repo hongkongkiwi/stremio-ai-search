@@ -42,6 +42,9 @@ In the configuration page you can choose an AI provider:
   - Model examples: `gpt-4o-mini`, `openai/gpt-4o-mini` (OpenRouter-style)
   - Optional extra headers (JSON): `{"HTTP-Referer":"https://example.com","X-Title":"Stremio AI Search"}`
 
+Advanced option:
+- **AI Temperature**: controls randomness (lower is more deterministic; default `0.2`)
+
 ## Customizing Your Homepage
 
 One of the most powerful features of this addon is the ability to create your own recommendation rows directly on the Stremio homepage. In the "Custom Homepage Catalogs" field within the addon's advanced settings, you can define multiple, comma-separated catalogs.

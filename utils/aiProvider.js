@@ -36,6 +36,13 @@ function getOpenAIChatCompletionsUrl(baseUrl) {
   return `${raw}/v1/chat/completions`;
 }
 
+function normalizeTemperature(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const num = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(num)) return undefined;
+  return Math.max(0, Math.min(1, num));
+}
+
 function parseOptionalJsonObject(text) {
   if (!text) return null;
   const raw = String(text).trim();
@@ -66,6 +73,7 @@ function buildExtraHeaders(extraHeaders) {
 
 function getAiProviderConfigFromConfig(configData = {}) {
   const provider = normalizeProviderName(configData.AiProvider);
+  const temperature = normalizeTemperature(configData.AiTemperature);
 
   if (provider === "openai-compat") {
     return {
@@ -75,6 +83,7 @@ function getAiProviderConfigFromConfig(configData = {}) {
       model: (configData.OpenAICompatModel || "gpt-4o-mini").trim(),
       extraHeaders: (configData.OpenAICompatExtraHeaders || "").trim(),
       timeoutMs: Number(configData.OpenAICompatTimeoutMs) || undefined,
+      temperature,
     };
   }
 
@@ -83,6 +92,7 @@ function getAiProviderConfigFromConfig(configData = {}) {
       provider: "gemini",
       apiKey: (configData.GeminiApiKey || "").trim(),
       model: (configData.GeminiModel || "gemini-2.5-flash-lite").trim(),
+      temperature,
     };
   }
 
@@ -100,6 +110,7 @@ function getAiProviderConfigFromConfig(configData = {}) {
       model: (configData.OpenAICompatModel || "gpt-4o-mini").trim(),
       extraHeaders: (configData.OpenAICompatExtraHeaders || "").trim(),
       timeoutMs: Number(configData.OpenAICompatTimeoutMs) || undefined,
+      temperature,
     };
   }
 
@@ -107,6 +118,7 @@ function getAiProviderConfigFromConfig(configData = {}) {
     provider: "gemini",
     apiKey: (configData.GeminiApiKey || "").trim(),
     model: (configData.GeminiModel || "gemini-2.5-flash-lite").trim(),
+    temperature,
   };
 }
 
@@ -122,7 +134,15 @@ function createAiTextGenerator(aiProviderConfig) {
       async generateText(prompt) {
         const { GoogleGenerativeAI } = require("@google/generative-ai");
         const genAI = new GoogleGenerativeAI(aiProviderConfig.apiKey);
-        const model = genAI.getGenerativeModel({ model: aiProviderConfig.model });
+        const model = genAI.getGenerativeModel({
+          model: aiProviderConfig.model,
+          generationConfig: {
+            temperature:
+              typeof aiProviderConfig.temperature === "number"
+                ? aiProviderConfig.temperature
+                : 0.2,
+          },
+        });
         const aiResult = await model.generateContent(prompt);
         return aiResult.response.text().trim();
       },
@@ -170,7 +190,10 @@ function createAiTextGenerator(aiProviderConfig) {
             body: JSON.stringify({
               model: aiProviderConfig.model,
               messages: [{ role: "user", content: prompt }],
-              temperature: 0.2,
+              temperature:
+                typeof aiProviderConfig.temperature === "number"
+                  ? aiProviderConfig.temperature
+                  : 0.2,
               max_tokens: 800,
             }),
           });

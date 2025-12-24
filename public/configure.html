@@ -949,6 +949,23 @@
               Higher values may increase response time
             </div>
           </div>
+
+          <div class="form-group">
+            <label class="form-label" for="aiTemperature">AI Temperature</label>
+            <input
+              type="number"
+              id="aiTemperature"
+              placeholder="Default: 0.2"
+              min="0"
+              max="1"
+              step="0.1"
+              value="0.2"
+            />
+            <div class="help-text">
+              Controls randomness. Lower values are more deterministic and tend
+              to follow the required output format more reliably.
+            </div>
+          </div>
         </div>
 
         <div class="button-group">
@@ -1272,6 +1289,7 @@
             RpdbApiKey: document.getElementById("rpdbKey").value.trim(),
             FanartApiKey: document.getElementById("fanartKey").value.trim(),
             NumResults: parseInt(document.getElementById("numResults").value.trim()) || 20,
+            AiTemperature: parseFloat(document.getElementById("aiTemperature").value.trim()) || 0.2,
             EnableAiCache: document.getElementById("enableAiCache").checked,
             TmdbLanguage: document.getElementById("tmdbLanguage").value,
             EnableRpdb: document.getElementById("enableRpdbPosters").checked,
@@ -1379,6 +1397,7 @@
               OpenAICompatModel: openaiCompatModel,
               OpenAICompatBaseUrl: openaiCompatBaseUrl,
               OpenAICompatExtraHeaders: openaiCompatExtraHeaders,
+              AiTemperature: parseFloat(document.getElementById("aiTemperature").value.trim()) || 0.2,
               TmdbApiKey: tmdbKey,
               FanartApiKey: fanartKey,
               TraktAccessToken: traktAccessToken,
@@ -1493,6 +1512,9 @@
         document.getElementById("manual-url").style.display = "none";
       });
       document.getElementById("numResults").addEventListener("input", () => {
+        document.getElementById("manual-url").style.display = "none";
+      });
+      document.getElementById("aiTemperature").addEventListener("input", () => {
         document.getElementById("manual-url").style.display = "none";
       });
       // NEW: Add listener for the RPDB enable checkbox
@@ -1647,6 +1669,8 @@
                   config.TmdbLanguage;
               if (config.NumResults)
                 document.getElementById("numResults").value = config.NumResults;
+              if (config.AiTemperature !== undefined)
+                document.getElementById("aiTemperature").value = config.AiTemperature;
               if (config.EnableAiCache !== undefined)
                 document.getElementById("enableAiCache").checked =
                   config.EnableAiCache;
@@ -1702,6 +1726,7 @@
               if (
                 config.RpdbApiKey ||
                 config.NumResults ||
+                config.AiTemperature !== undefined ||
                 config.EnableAiCache !== undefined ||
                 config.TraktAccessToken ||
                 config.GeminiModel ||
