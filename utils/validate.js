@@ -2,6 +2,7 @@ const {
   createAiTextGenerator,
   getAiProviderConfigFromConfig,
 } = require("./aiProvider");
+const fetch = require("./fetch");
 
 async function validateAiProvider(body, deps = {}) {
   const aiProviderConfig = getAiProviderConfigFromConfig(body);
@@ -41,7 +42,7 @@ async function validateAiProvider(body, deps = {}) {
 }
 
 async function validateTmdbApiKey(tmdbApiKey, deps = {}) {
-  const fetchFn = deps.fetch || globalThis.fetch;
+  const fetchFn = deps.fetch || fetch;
   const result = { tmdb: false, errors: {} };
 
   if (!tmdbApiKey) {

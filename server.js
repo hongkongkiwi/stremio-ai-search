@@ -24,11 +24,13 @@ const rateLimit = require("express-rate-limit");
 const fs = require("fs");
 const path = require("path");
 const logger = require("./utils/logger");
+const fetch = require("./utils/fetch");
 const { handleIssueSubmission } = require("./utils/issueHandler");
 const {
   createAiTextGenerator,
   getAiProviderConfigFromConfig,
 } = require("./utils/aiProvider");
+const { validateAiProvider, validateTmdbApiKey } = require("./utils/validate");
 const {
   encryptConfig,
   decryptConfig,
@@ -1527,51 +1529,26 @@ app.post(["/validate", "/aisearch/validate"], express.json(), async (req, res) =
     const validations = [];
 
     // AI Provider Validation (Gemini or OpenAI-compatible)
-    if (aiProviderConfig.apiKey) {
-      validations.push((async () => {
-        try {
-          const aiClient = createAiTextGenerator(aiProviderConfig);
-          const responseText = await aiClient.generateText("Test prompt");
-          if (responseText && responseText.length > 0) {
-            validationResults.ai = true;
-            if (aiProviderConfig.provider === "gemini") {
-              validationResults.gemini = true;
-            } else {
-              validationResults.openaiCompat = true;
-            }
-          } else {
-            validationResults.errors.ai = "Invalid AI provider API key - No response";
-          }
-        } catch (error) {
-          validationResults.errors.ai = `Invalid AI provider API key: ${error.message}`;
-        }
-      })());
-    } else {
-      if (aiProviderConfig.provider === "openai-compat") {
-        validationResults.errors.ai = "OpenAI-compatible API key is required.";
-      } else {
-        validationResults.errors.ai = "Gemini API Key is required.";
-      }
-    }
+    validations.push(
+      (async () => {
+        const ai = await validateAiProvider(req.body, {
+          createAiClient: createAiTextGenerator,
+        });
+        validationResults.ai = ai.ai;
+        validationResults.gemini = ai.gemini;
+        validationResults.openaiCompat = ai.openaiCompat;
+        if (ai.errors?.ai) validationResults.errors.ai = ai.errors.ai;
+      })()
+    );
 
     // TMDB Validation
-    if (TmdbApiKey) {
-      validations.push((async () => {
-        try {
-          const tmdbUrl = `${TMDB_API_BASE}/configuration?api_key=${TmdbApiKey}`;
-          const tmdbResponse = await fetch(tmdbUrl);
-          if (tmdbResponse.ok) {
-            validationResults.tmdb = true;
-          } else {
-            validationResults.errors.tmdb = `Invalid TMDB API key (Status: ${tmdbResponse.status})`;
-          }
-        } catch (error) {
-          validationResults.errors.tmdb = "TMDB API validation failed";
-        }
-      })());
-    } else {
-        validationResults.errors.tmdb = "TMDB API Key is required.";
-    }
+    validations.push(
+      (async () => {
+        const tmdb = await validateTmdbApiKey(TmdbApiKey, { fetch });
+        validationResults.tmdb = tmdb.tmdb;
+        if (tmdb.errors?.tmdb) validationResults.errors.tmdb = tmdb.errors.tmdb;
+      })()
+    );
 
     // Fanart.tv Validation (Optional)
     if (FanartApiKey) {
