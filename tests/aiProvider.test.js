@@ -29,6 +29,34 @@ function createCapturingFetch() {
   return { fetch, calls };
 }
 
+function createAbortAwareHangingFetch() {
+  const calls = [];
+  const fetch = (url, options) => {
+    calls.push({ url, options });
+    return new Promise((resolve, reject) => {
+      if (options && options.signal) {
+        if (options.signal.aborted) {
+          const err = new Error("Aborted");
+          err.name = "AbortError";
+          reject(err);
+          return;
+        }
+        options.signal.addEventListener(
+          "abort",
+          () => {
+            const err = new Error("Aborted");
+            err.name = "AbortError";
+            reject(err);
+          },
+          { once: true }
+        );
+      }
+      // Never resolve: simulates a hung upstream until aborted.
+    });
+  };
+  return { fetch, calls };
+}
+
 async function testChatCompletionsUrl() {
   const { getOpenAIChatCompletionsUrl } = require("../utils/aiProvider");
 
@@ -77,6 +105,50 @@ async function testTemperatureClamping() {
       .temperature,
     0.7
   );
+
+  // Default (unset / invalid)
+  assert.equal(
+    getAiProviderConfigFromConfig({ AiProvider: "gemini" }).temperature,
+    undefined
+  );
+  assert.equal(
+    getAiProviderConfigFromConfig({ AiProvider: "gemini", AiTemperature: "nope" })
+      .temperature,
+    undefined
+  );
+}
+
+async function testProviderNormalizationAndFallbacks() {
+  const { getAiProviderConfigFromConfig } = require("../utils/aiProvider");
+
+  // Synonyms normalize
+  assert.equal(
+    getAiProviderConfigFromConfig({ AiProvider: "openrouter", OpenAICompatApiKey: "k" })
+      .provider,
+    "openai-compat"
+  );
+  assert.equal(
+    getAiProviderConfigFromConfig({ AiProvider: "openai", OpenAICompatApiKey: "k" })
+      .provider,
+    "openai-compat"
+  );
+  assert.equal(
+    getAiProviderConfigFromConfig({ AiProvider: "zai", OpenAICompatApiKey: "k" })
+      .provider,
+    "openai-compat"
+  );
+  assert.equal(
+    getAiProviderConfigFromConfig({ AiProvider: "google", GeminiApiKey: "k" }).provider,
+    "gemini"
+  );
+
+  // Backward compatibility fallbacks
+  assert.equal(
+    getAiProviderConfigFromConfig({ OpenAICompatApiKey: "k", OpenAICompatModel: "m" })
+      .provider,
+    "openai-compat"
+  );
+  assert.equal(getAiProviderConfigFromConfig({ GeminiApiKey: "k" }).provider, "gemini");
 }
 
 async function testOpenAICompatPayloadAndHeaders() {
@@ -134,10 +206,52 @@ async function testOpenAICompatExtraHeadersInvalidJson() {
   );
 }
 
+async function testOpenAICompatExtraHeadersMustBeObject() {
+  const { fetch } = createCapturingFetch();
+  const aiProvider = freshRequireAiProviderWithFetch(fetch);
+
+  const config = aiProvider.getAiProviderConfigFromConfig({
+    AiProvider: "openai-compat",
+    OpenAICompatApiKey: "sk-test",
+    OpenAICompatModel: "gpt-4o-mini",
+    OpenAICompatExtraHeaders: '["nope"]',
+  });
+
+  const client = aiProvider.createAiTextGenerator(config);
+  await assert.rejects(
+    () => client.generateText("hello"),
+    (err) => err && err.status === 400
+  );
+}
+
+async function testOpenAICompatTimeoutAbort() {
+  const { fetch, calls } = createAbortAwareHangingFetch();
+  const aiProvider = freshRequireAiProviderWithFetch(fetch);
+
+  const config = aiProvider.getAiProviderConfigFromConfig({
+    AiProvider: "openai-compat",
+    OpenAICompatApiKey: "sk-test",
+    OpenAICompatBaseUrl: "https://api.openai.com",
+    OpenAICompatModel: "gpt-4o-mini",
+    OpenAICompatTimeoutMs: 5,
+  });
+
+  const client = aiProvider.createAiTextGenerator(config);
+  await assert.rejects(
+    () => client.generateText("hello"),
+    (err) => err && err.status === 504
+  );
+
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].options.signal, "fetch called with an AbortSignal");
+}
+
 module.exports.run = async function run() {
   await testChatCompletionsUrl();
   await testTemperatureClamping();
+  await testProviderNormalizationAndFallbacks();
   await testOpenAICompatPayloadAndHeaders();
   await testOpenAICompatExtraHeadersInvalidJson();
+  await testOpenAICompatExtraHeadersMustBeObject();
+  await testOpenAICompatTimeoutAbort();
 };
-
