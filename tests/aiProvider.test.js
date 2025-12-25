@@ -266,6 +266,62 @@ async function testOpenAICompatTimeoutAbort() {
   });
 }
 
+async function testTanstackOpenAICompatMock() {
+  await withEnv("AI_USE_TANSTACK", "true", async () => {
+    await withEnv("AI_TANSTACK_MODULES_PATH", "tests/fixtures/tanstack-mock.mjs", async () => {
+      const { fetch } = createCapturingFetch();
+      const aiProvider = freshRequireAiProviderWithFetch(fetch);
+      const config = aiProvider.getAiProviderConfigFromConfig({
+        AiProvider: "openai-compat",
+        OpenAICompatApiKey: "sk-test",
+        OpenAICompatModel: "openai/gpt-4o-mini",
+      });
+      const client = aiProvider.createAiTextGenerator(config);
+      const text = await client.generateText("hello");
+      assert.equal(text, "openai:openai/gpt-4o-mini:ok");
+    });
+  });
+}
+
+async function testTanstackGeminiMock() {
+  await withEnv("AI_USE_TANSTACK", "true", async () => {
+    await withEnv("AI_TANSTACK_MODULES_PATH", "tests/fixtures/tanstack-mock.mjs", async () => {
+      const { fetch } = createCapturingFetch();
+      const aiProvider = freshRequireAiProviderWithFetch(fetch);
+      const config = aiProvider.getAiProviderConfigFromConfig({
+        AiProvider: "gemini",
+        GeminiApiKey: "k",
+        GeminiModel: "gemini-mock",
+      });
+      const client = aiProvider.createAiTextGenerator(config);
+      const text = await client.generateText("hello");
+      assert.equal(text, "gemini:gemini-mock:ok");
+    });
+  });
+}
+
+async function testGeminiMockBaseUrlUsesOpenAICompat() {
+  await withEnv("AI_USE_TANSTACK", "false", async () => {
+    await withEnv("GEMINI_MOCK_BASE_URL", "https://mock.local", async () => {
+      const { fetch, calls } = createCapturingFetch();
+      const aiProvider = freshRequireAiProviderWithFetch(fetch);
+      const config = aiProvider.getAiProviderConfigFromConfig({
+        AiProvider: "gemini",
+        GeminiApiKey: "k",
+        GeminiModel: "gemini-2.5-flash-lite",
+        AiTemperature: 0,
+      });
+      const client = aiProvider.createAiTextGenerator(config);
+      const text = await client.generateText("hello");
+      assert.equal(text, "ok");
+      assert.equal(calls[0].url, "https://mock.local/v1/chat/completions");
+      const payload = JSON.parse(calls[0].options.body);
+      assert.equal(payload.model, "mock");
+      assert.equal(payload.temperature, 0);
+    });
+  });
+}
+
 module.exports.run = async function run() {
   await testChatCompletionsUrl();
   await testTemperatureClamping();
@@ -274,4 +330,7 @@ module.exports.run = async function run() {
   await testOpenAICompatExtraHeadersInvalidJson();
   await testOpenAICompatExtraHeadersMustBeObject();
   await testOpenAICompatTimeoutAbort();
+  await testTanstackOpenAICompatMock();
+  await testTanstackGeminiMock();
+  await testGeminiMockBaseUrlUsesOpenAICompat();
 };

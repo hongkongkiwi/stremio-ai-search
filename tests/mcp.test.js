@@ -146,11 +146,45 @@ async function testInvalidServersJsonDisablesContext() {
   else process.env.MCP_SERVERS_JSON = prevServers;
 }
 
+async function testMultipleServersErrorIsolation() {
+  const prevEnabled = process.env.MCP_ENABLED;
+  process.env.MCP_ENABLED = "true";
+
+  const servers = [
+    { id: "ok", enabled: true, toolCalls: [{ name: "t1", args: { q: "{{query}}" } }] },
+    { id: "fail", enabled: true, toolCalls: [{ name: "t2", args: { q: "{{query}}" } }] },
+  ];
+
+  const ctx = await getMcpContext(
+    { query: "hello", type: "movie" },
+    {
+      servers,
+      toolRunner: async (server, name, renderedArgs) => {
+        if (server.id === "fail") throw new Error("boom");
+        return { ok: true, name, args: renderedArgs };
+      },
+    }
+  );
+
+  const parsed = JSON.parse(ctx);
+  assert.equal(parsed.length, 2);
+  const ok = parsed.find((s) => s.serverId === "ok");
+  const fail = parsed.find((s) => s.serverId === "fail");
+  assert.equal(ok.toolCalls[0].name, "t1");
+  assert.equal(ok.toolCalls[0].result.ok, true);
+  assert.equal(fail.toolCalls[0].name, "t2");
+  assert.equal(fail.toolCalls[0].error, "boom");
+
+  if (prevEnabled === undefined) delete process.env.MCP_ENABLED;
+  else process.env.MCP_ENABLED = prevEnabled;
+}
+
 module.exports.run = async function run() {
   await testTemplateSubstitution();
   await testMcpDisabledNoContext();
   await testServersJsonParsing();
   await testMcpServersObjectParsing();
   await testMultipleServersContextUsesTemplates();
+  await testMultipleServersErrorIsolation();
   await testInvalidServersJsonDisablesContext();
 };

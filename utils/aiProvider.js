@@ -1,4 +1,6 @@
 const fetch = require("./fetch");
+const path = require("path");
+const { pathToFileURL } = require("url");
 
 function normalizeProviderName(provider) {
   if (!provider) return null;
@@ -81,6 +83,21 @@ async function loadTanstackModules() {
   if (!isTanstackEnabled()) return null;
 
   try {
+    const overridePath = process.env.AI_TANSTACK_MODULES_PATH;
+    if (overridePath && String(overridePath).trim()) {
+      const resolved = pathToFileURL(path.resolve(String(overridePath))).href;
+      const override = await import(resolved);
+      const chat = override.chat;
+      const streamToText = override.streamToText;
+      const createOpenaiChat = override.createOpenaiChat;
+      const createGeminiChat = override.createGeminiChat;
+      if (!chat || !streamToText || !createOpenaiChat || !createGeminiChat) {
+        throw new Error("TanStack AI override missing expected exports");
+      }
+      cachedTanstackModules = { chat, streamToText, createOpenaiChat, createGeminiChat };
+      return cachedTanstackModules;
+    }
+
     const aiCore = await import("@tanstack/ai");
     const openaiAdapters = await import("@tanstack/ai-openai");
     const geminiAdapters = await import("@tanstack/ai-gemini");
