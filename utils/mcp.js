@@ -37,12 +37,14 @@ function isMcpSpawnAllowed() {
 function normalizeServerConfig(raw, index) {
   const id =
     typeof raw?.id === "string" && raw.id.trim() ? raw.id.trim() : `mcp_${index + 1}`;
-  const enabled = raw?.enabled === undefined ? true : Boolean(raw.enabled);
+  const enabled =
+    raw?.enabled !== undefined ? Boolean(raw.enabled) : raw?.disabled !== undefined ? !Boolean(raw.disabled) : true;
   const transport = raw?.transport ? String(raw.transport) : "stdio";
-  const cmd = raw?.cmd ? String(raw.cmd).trim() : "";
+  const cmd = raw?.cmd ? String(raw.cmd).trim() : raw?.command ? String(raw.command).trim() : "";
   const args = raw?.args === undefined ? [] : raw.args;
   const timeoutMs = Number(raw?.timeoutMs ?? process.env.MCP_TIMEOUT_MS ?? 5000);
   const toolCalls = raw?.toolCalls === undefined ? [] : raw.toolCalls;
+  const env = raw?.env && typeof raw.env === "object" && !Array.isArray(raw.env) ? raw.env : undefined;
 
   return {
     id,
@@ -52,6 +54,7 @@ function normalizeServerConfig(raw, index) {
     args,
     timeoutMs,
     toolCalls,
+    env,
   };
 }
 
@@ -83,8 +86,18 @@ function getServersFromEnv() {
   const raw = process.env.MCP_SERVERS_JSON;
   if (raw && String(raw).trim()) {
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error("MCP_SERVERS_JSON must be a JSON array");
-    return parsed.map((s, i) => normalizeServerConfig(s, i));
+    if (Array.isArray(parsed)) {
+      return parsed.map((s, i) => normalizeServerConfig(s, i));
+    }
+    if (parsed && typeof parsed === "object") {
+      const mcpServers = parsed.mcpServers;
+      if (mcpServers && typeof mcpServers === "object" && !Array.isArray(mcpServers)) {
+        return Object.entries(mcpServers).map(([serverId, cfg], i) =>
+          normalizeServerConfig({ id: serverId, ...(cfg || {}) }, i)
+        );
+      }
+    }
+    throw new Error('MCP_SERVERS_JSON must be either a JSON array or an object with an "mcpServers" map');
   }
   return getServersFromLegacyEnv();
 }
@@ -110,7 +123,7 @@ async function startMcpClient(server) {
 
   const child = spawn(cmd, args, {
     stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env },
+    env: { ...process.env, ...(server.env || {}) },
   });
 
   child.on("exit", (code, signal) => {

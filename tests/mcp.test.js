@@ -56,6 +56,38 @@ async function testServersJsonParsing() {
   else process.env.MCP_SERVERS_JSON = prev;
 }
 
+async function testMcpServersObjectParsing() {
+  const prev = process.env.MCP_SERVERS_JSON;
+  const cfg = {
+    mcpServers: {
+      web: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-foo"],
+        env: { FOO: "bar" },
+        toolCalls: [{ name: "web.search", args: { query: "{{query}}" } }],
+      },
+      disabledOne: {
+        command: "node",
+        args: ["server.js"],
+        disabled: true,
+        toolCalls: [{ name: "noop", args: {} }],
+      },
+    },
+  };
+
+  process.env.MCP_SERVERS_JSON = JSON.stringify(cfg);
+  const servers = getServersFromEnv();
+  assert.equal(servers.length, 2);
+  assert.equal(servers[0].id, "web");
+  assert.equal(servers[0].cmd, "npx");
+  assert.deepEqual(servers[0].env, { FOO: "bar" });
+  assert.equal(servers[1].id, "disabledOne");
+  assert.equal(servers[1].enabled, false);
+
+  if (prev === undefined) delete process.env.MCP_SERVERS_JSON;
+  else process.env.MCP_SERVERS_JSON = prev;
+}
+
 async function testMultipleServersContextUsesTemplates() {
   const prevEnabled = process.env.MCP_ENABLED;
   process.env.MCP_ENABLED = "true";
@@ -118,6 +150,7 @@ module.exports.run = async function run() {
   await testTemplateSubstitution();
   await testMcpDisabledNoContext();
   await testServersJsonParsing();
+  await testMcpServersObjectParsing();
   await testMultipleServersContextUsesTemplates();
   await testInvalidServersJsonDisablesContext();
 };

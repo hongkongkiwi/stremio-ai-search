@@ -88,8 +88,11 @@ This is intended for **self-hosted** deployments only. For safety, MCP is disabl
 Environment variables:
 - `MCP_ENABLED=true` to enable MCP augmentation
 - `MCP_ALLOW_SPAWN=true` to allow spawning an MCP server process (required)
-- `MCP_SERVERS_JSON` JSON array of MCP servers to run (preferred; supports multiple). Example:
-  - `[{"id":"web","cmd":"npx","args":["-y","@modelcontextprotocol/server-foo"],"timeoutMs":5000,"toolCalls":[{"name":"web.search","args":{"query":"{{query}}","limit":5}}]}]`
+- `MCP_SERVERS_JSON` MCP server config (preferred; supports multiple). Accepts either:
+  - A JSON object with an `mcpServers` map (common format):
+    - `{"mcpServers":{"web":{"command":"npx","args":["-y","@modelcontextprotocol/server-foo"],"env":{},"toolCalls":[{"name":"web.search","args":{"query":"{{query}}","limit":5}}]}}}`
+  - Or a JSON array of servers:
+    - `[{"id":"web","cmd":"npx","args":["-y","@modelcontextprotocol/server-foo"],"timeoutMs":5000,"toolCalls":[{"name":"web.search","args":{"query":"{{query}}","limit":5}}]}]`
 - `MCP_TIMEOUT_MS` default tool/connect timeout in ms (default 5000)
 - `MCP_MAX_CONTEXT_CHARS` max chars injected into prompt (default 8000)
 
