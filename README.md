@@ -118,6 +118,14 @@ Legacy single-server env vars (used only if `MCP_SERVERS_JSON` is not set):
 
 When enabled, MCP tool results are appended to the model prompt under `MCP CONTEXT (JSON)`.
 
+### MCP examples
+
+`MCP_SERVERS_JSON` with `mcpServers` map:
+`{"mcpServers":{"web":{"command":"npx","args":["-y","@modelcontextprotocol/server-foo"],"toolCalls":[{"name":"web.search","args":{"query":"{{query}}","limit":5}}]}}}`
+
+Run a local smoke check (TanStack mock + MCP):
+`pnpm run smoke:tanstack:mcp`
+
 ## Customizing Your Homepage
 
 One of the most powerful features of this addon is the ability to create your own recommendation rows directly on the Stremio homepage. In the "Custom Homepage Catalogs" field within the addon's advanced settings, you can define multiple, comma-separated catalogs.

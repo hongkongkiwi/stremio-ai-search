@@ -12,7 +12,8 @@
     "smoke:catalog": "node scripts/smoke-catalog.js",
     "smoke:similar": "node scripts/smoke-similar.js",
     "smoke:all:mock": "node scripts/smoke-all-mock.js",
-    "smoke:all:mock:gemini": "node scripts/smoke-all-mock.js --provider gemini"
+    "smoke:all:mock:gemini": "node scripts/smoke-all-mock.js --provider gemini",
+    "smoke:tanstack:mcp": "node scripts/smoke-tanstack-mcp.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
