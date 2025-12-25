@@ -35,6 +35,15 @@ This addon uses TanStack AI adapters for provider calls. Install:
    <img src="public/bmc.png" alt="Buy Me A Coffee" height="40" />
    </a>
 
+## Development
+
+Use pnpm for local installs:
+
+```bash
+pnpm install
+pnpm test
+```
+
 ## AI Provider Setup
 
 In the configuration page you can choose an AI provider:

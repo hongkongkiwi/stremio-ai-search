@@ -14,6 +14,7 @@ logs/
 *.swp
 *.swo
 .DS_Store
+.codex/
 
 # Unnecessary files
 index.html
