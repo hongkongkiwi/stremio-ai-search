@@ -60,6 +60,111 @@ function buildExtraHeaders(extraHeaders) {
   return headers;
 }
 
+function isModuleNotFound(error) {
+  if (!error) return false;
+  return (
+    error.code === "ERR_MODULE_NOT_FOUND" ||
+    error.code === "MODULE_NOT_FOUND" ||
+    /Cannot find module/i.test(error.message || "")
+  );
+}
+
+let cachedTanstackModules = null;
+async function loadTanstackModules() {
+  if (cachedTanstackModules) return cachedTanstackModules;
+
+  try {
+    const aiCore = await import("@tanstack/ai");
+    const openaiAdapters = await import("@tanstack/ai-openai/adapters");
+    const geminiAdapters = await import("@tanstack/ai-gemini/adapters");
+
+    const generate = aiCore.generate || (aiCore.default && aiCore.default.generate);
+    const openaiText = openaiAdapters.openaiText || (openaiAdapters.default && openaiAdapters.default.openaiText);
+    const geminiText = geminiAdapters.geminiText || (geminiAdapters.default && geminiAdapters.default.geminiText);
+
+    if (!generate || !openaiText || !geminiText) {
+      throw new Error("TanStack AI adapters missing expected exports");
+    }
+
+    cachedTanstackModules = { generate, openaiText, geminiText };
+    return cachedTanstackModules;
+  } catch (error) {
+    if (isModuleNotFound(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function extractChunkText(chunk) {
+  if (chunk === undefined || chunk === null) return "";
+  if (typeof chunk === "string") return chunk;
+  if (typeof chunk === "number") return String(chunk);
+  if (typeof chunk === "object") {
+    if (typeof chunk.text === "string") return chunk.text;
+    if (typeof chunk.content === "string") return chunk.content;
+    if (chunk.delta && typeof chunk.delta.content === "string") return chunk.delta.content;
+    if (chunk.value && typeof chunk.value === "string") return chunk.value;
+  }
+  return "";
+}
+
+async function generateWithTanstackAi({
+  adapter,
+  model,
+  prompt,
+  temperature,
+  timeoutMs,
+}) {
+  const modules = await loadTanstackModules();
+  if (!modules || !modules.generate) throw new Error("TanStack AI is not available");
+  const { generate } = modules;
+
+  const run = async () => {
+    const result = generate({
+      adapter,
+      model,
+      messages: [{ role: "user", content: [{ type: "text", content: prompt }] }],
+      temperature: typeof temperature === "number" ? temperature : undefined,
+    });
+
+    let text = "";
+    if (result && typeof result[Symbol.asyncIterator] === "function") {
+      for await (const chunk of result) {
+        text += extractChunkText(chunk);
+      }
+      return text.trim();
+    }
+
+    if (typeof result === "string") return result.trim();
+    if (result && typeof result.text === "function") {
+      const resolved = await result.text();
+      return String(resolved || "").trim();
+    }
+    return String(result || "").trim();
+  };
+
+  if (typeof timeoutMs === "number" && timeoutMs > 0) {
+    let timeoutId;
+    try {
+      return await Promise.race([
+        run(),
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            const err = new Error(`TanStack AI request timed out after ${timeoutMs}ms`);
+            err.status = 504;
+            reject(err);
+          }, timeoutMs);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  return run();
+}
+
 function getAiProviderConfigFromConfig(configData = {}) {
   const provider = normalizeProviderName(configData.AiProvider);
   const temperature = normalizeTemperature(configData.AiTemperature);
@@ -152,6 +257,19 @@ function createAiTextGenerator(aiProviderConfig) {
           return String(content).trim();
         }
 
+        const tanstack = await loadTanstackModules();
+        if (tanstack) {
+          const adapter = tanstack.geminiText({
+            apiKey: aiProviderConfig.apiKey,
+          });
+          return await generateWithTanstackAi({
+            adapter,
+            model: aiProviderConfig.model,
+            prompt,
+            temperature: aiProviderConfig.temperature,
+          });
+        }
+
         const { GoogleGenerativeAI } = require("@google/generative-ai");
         const genAI = new GoogleGenerativeAI(aiProviderConfig.apiKey);
         const model = genAI.getGenerativeModel({
@@ -174,13 +292,6 @@ function createAiTextGenerator(aiProviderConfig) {
       provider: "openai-compat",
       model: aiProviderConfig.model,
       async generateText(prompt) {
-        const timeoutMs =
-          typeof aiProviderConfig.timeoutMs === "number" && aiProviderConfig.timeoutMs > 0
-            ? aiProviderConfig.timeoutMs
-            : 30000;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
         let extraHeadersObj;
         try {
           extraHeadersObj = parseOptionalJsonObject(aiProviderConfig.extraHeaders);
@@ -189,6 +300,33 @@ function createAiTextGenerator(aiProviderConfig) {
           parseError.status = 400;
           throw parseError;
         }
+
+        const tanstack = await loadTanstackModules();
+        if (tanstack) {
+          const adapter = tanstack.openaiText({
+            apiKey: aiProviderConfig.apiKey,
+            baseUrl: aiProviderConfig.baseUrl,
+            baseURL: aiProviderConfig.baseUrl,
+            headers: buildExtraHeaders(extraHeadersObj),
+          });
+          return await generateWithTanstackAi({
+            adapter,
+            model: aiProviderConfig.model,
+            prompt,
+            temperature: aiProviderConfig.temperature,
+            timeoutMs:
+              typeof aiProviderConfig.timeoutMs === "number" && aiProviderConfig.timeoutMs > 0
+                ? aiProviderConfig.timeoutMs
+                : undefined,
+          });
+        }
+
+        const timeoutMs =
+          typeof aiProviderConfig.timeoutMs === "number" && aiProviderConfig.timeoutMs > 0
+            ? aiProviderConfig.timeoutMs
+            : 30000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         const url = getOpenAIChatCompletionsUrl(aiProviderConfig.baseUrl);
         let response;

@@ -20,6 +20,9 @@ An intelligent search addon for Stremio powered by AI (Gemini-compatible or any 
 - AI based Similar items recommendation in streams view
 - Error Posters in case of errors for better user experience
 
+This addon uses TanStack AI adapters for provider calls. Install:
+`@tanstack/ai`, `@tanstack/ai-openai`, `@tanstack/ai-gemini`.
+
 ## Installation
 
 1. Visit [Addon configuration](https://stremio.itcon.au/aisearch/configure)
