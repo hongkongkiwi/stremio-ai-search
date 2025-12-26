@@ -80,7 +80,9 @@ async function testValidateAiProviderPropagatesError() {
 async function testValidateAiProviderTanstackError() {
   const prevUse = process.env.AI_USE_TANSTACK;
   const prevPath = process.env.AI_TANSTACK_MODULES_PATH;
+  const prevAllow = process.env.AI_ALLOW_TANSTACK_OVERRIDE;
   process.env.AI_USE_TANSTACK = "true";
+  process.env.AI_ALLOW_TANSTACK_OVERRIDE = "true";
   process.env.AI_TANSTACK_MODULES_PATH = path.join(
     process.cwd(),
     "tests",
@@ -102,6 +104,8 @@ async function testValidateAiProviderTanstackError() {
 
   if (prevUse === undefined) delete process.env.AI_USE_TANSTACK;
   else process.env.AI_USE_TANSTACK = prevUse;
+  if (prevAllow === undefined) delete process.env.AI_ALLOW_TANSTACK_OVERRIDE;
+  else process.env.AI_ALLOW_TANSTACK_OVERRIDE = prevAllow;
   if (prevPath === undefined) delete process.env.AI_TANSTACK_MODULES_PATH;
   else process.env.AI_TANSTACK_MODULES_PATH = prevPath;
 

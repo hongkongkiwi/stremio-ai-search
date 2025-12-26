@@ -268,7 +268,8 @@ async function testOpenAICompatTimeoutAbort() {
 
 async function testTanstackOpenAICompatMock() {
   await withEnv("AI_USE_TANSTACK", "true", async () => {
-    await withEnv("AI_TANSTACK_MODULES_PATH", "tests/fixtures/tanstack-mock.mjs", async () => {
+    await withEnv("AI_ALLOW_TANSTACK_OVERRIDE", "true", async () => {
+      await withEnv("AI_TANSTACK_MODULES_PATH", "tests/fixtures/tanstack-mock.mjs", async () => {
       const { fetch } = createCapturingFetch();
       const aiProvider = freshRequireAiProviderWithFetch(fetch);
       const config = aiProvider.getAiProviderConfigFromConfig({
@@ -279,13 +280,15 @@ async function testTanstackOpenAICompatMock() {
       const client = aiProvider.createAiTextGenerator(config);
       const text = await client.generateText("hello");
       assert.equal(text, "openai:openai/gpt-4o-mini:ok");
+      });
     });
   });
 }
 
 async function testTanstackGeminiMock() {
   await withEnv("AI_USE_TANSTACK", "true", async () => {
-    await withEnv("AI_TANSTACK_MODULES_PATH", "tests/fixtures/tanstack-mock.mjs", async () => {
+    await withEnv("AI_ALLOW_TANSTACK_OVERRIDE", "true", async () => {
+      await withEnv("AI_TANSTACK_MODULES_PATH", "tests/fixtures/tanstack-mock.mjs", async () => {
       const { fetch } = createCapturingFetch();
       const aiProvider = freshRequireAiProviderWithFetch(fetch);
       const config = aiProvider.getAiProviderConfigFromConfig({
@@ -296,6 +299,7 @@ async function testTanstackGeminiMock() {
       const client = aiProvider.createAiTextGenerator(config);
       const text = await client.generateText("hello");
       assert.equal(text, "gemini:gemini-mock:ok");
+      });
     });
   });
 }
@@ -324,7 +328,8 @@ async function testGeminiMockBaseUrlUsesOpenAICompat() {
 
 async function testTanstackOpenAICompatAdapterConfig() {
   await withEnv("AI_USE_TANSTACK", "true", async () => {
-    await withEnv("AI_TANSTACK_MODULES_PATH", "tests/fixtures/tanstack-mock-config.mjs", async () => {
+    await withEnv("AI_ALLOW_TANSTACK_OVERRIDE", "true", async () => {
+      await withEnv("AI_TANSTACK_MODULES_PATH", "tests/fixtures/tanstack-mock-config.mjs", async () => {
       const { fetch } = createCapturingFetch();
       const aiProvider = freshRequireAiProviderWithFetch(fetch);
       const config = aiProvider.getAiProviderConfigFromConfig({
@@ -343,6 +348,7 @@ async function testTanstackOpenAICompatAdapterConfig() {
       assert.equal(payload.baseUrl, "https://openrouter.ai/api");
       assert.equal(payload.headers["HTTP-Referer"], "https://example.com");
       assert.equal(payload.headers["X-Title"], "Stremio AI Search");
+      });
     });
   });
 }

@@ -85,6 +85,9 @@ async function loadTanstackModules() {
   try {
     const overridePath = process.env.AI_TANSTACK_MODULES_PATH;
     if (overridePath && String(overridePath).trim()) {
+      if (!isTruthy(process.env.AI_ALLOW_TANSTACK_OVERRIDE) && process.env.NODE_ENV !== "test") {
+        throw new Error("TanStack override path is disabled; set AI_ALLOW_TANSTACK_OVERRIDE=true to enable");
+      }
       const resolved = pathToFileURL(path.resolve(String(overridePath))).href;
       const override = await import(resolved);
       const chat = override.chat;
@@ -124,6 +127,10 @@ async function loadTanstackModules() {
     }
     throw error;
   }
+}
+
+function isTruthy(value) {
+  return String(value || "").toLowerCase() === "true";
 }
 
 function extractChunkText(chunk) {

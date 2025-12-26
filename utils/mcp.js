@@ -33,6 +33,15 @@ function isMcpSpawnAllowed() {
   return isTruthy(process.env.MCP_ALLOW_SPAWN);
 }
 
+function getDefaultEnv() {
+  const allowlist = ["HOME", "LOGNAME", "PATH", "SHELL", "TERM", "USER"];
+  const env = {};
+  for (const key of allowlist) {
+    if (process.env[key] !== undefined) env[key] = process.env[key];
+  }
+  return env;
+}
+
 function normalizeServerConfig(raw, index) {
   const id =
     typeof raw?.id === "string" && raw.id.trim() ? raw.id.trim() : `mcp_${index + 1}`;
@@ -127,7 +136,7 @@ async function startMcpClient(server) {
   const transport = new StdioClientTransport({
     command: cmd,
     args,
-    env: server.env ? { ...process.env, ...server.env } : { ...process.env },
+    env: server.env ? { ...getDefaultEnv(), ...server.env } : getDefaultEnv(),
     stderr: "inherit",
   });
 
