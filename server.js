@@ -22,6 +22,7 @@ const express = require("express");
 const compression = require("compression");
 const { applyAddonRateLimit } = require("./server/middleware/rateLimit");
 const { registerCacheRoutes } = require("./server/routes/cache");
+const { registerConfigRoutes } = require("./server/routes/config");
 const logger = require("./utils/logger");
 const fetch = require("./utils/fetch");
 const { handleIssueSubmission } = require("./utils/issueHandler");
@@ -744,39 +745,6 @@ async function startServer() {
         });
       });
 
-      // Update the getConfig endpoint to handle the full path
-      addonRouter.get(routePath + "api/getConfig/:configId", (req, res) => {
-        try {
-          const { configId } = req.params;
-
-          // Remove any path prefix if present
-          const cleanConfigId = configId.split("/").pop();
-
-          if (!cleanConfigId || !isValidEncryptedFormat(cleanConfigId)) {
-            return res
-              .status(400)
-              .json({ error: "Invalid configuration format" });
-          }
-
-          const decryptedConfig = decryptConfig(cleanConfigId);
-          if (!decryptedConfig) {
-            return res
-              .status(400)
-              .json({ error: "Failed to decrypt configuration" });
-          }
-
-          // Parse and return the configuration
-          const config = JSON.parse(decryptedConfig);
-          res.json(config);
-        } catch (error) {
-          logger.error("Error getting configuration:", {
-            error: error.message,
-            stack: error.stack,
-          });
-          res.status(500).json({ error: "Internal server error" });
-        }
-      });
-
       registerCacheRoutes({
         router: addonRouter,
         routePath,
@@ -784,37 +752,11 @@ async function startServer() {
         saveCachesToFiles,
       });
 
-      // API endpoint to decrypt configuration
-      addonRouter.post(routePath + "api/decrypt-config", (req, res) => {
-        try {
-          const { encryptedConfig } = req.body;
-
-          if (!encryptedConfig || !isValidEncryptedFormat(encryptedConfig)) {
-            return res
-              .status(400)
-              .json({ error: "Invalid configuration format" });
-          }
-
-          const decryptedConfig = decryptConfig(encryptedConfig);
-
-          if (!decryptedConfig) {
-            return res
-              .status(400)
-              .json({ error: "Failed to decrypt configuration" });
-          }
-
-          // Parse the decrypted JSON
-          const config = JSON.parse(decryptedConfig);
-
-          // Return the configuration object
-          res.json(config);
-        } catch (error) {
-          logger.error("Error decrypting configuration:", {
-            error: error.message,
-            stack: error.stack,
-          });
-          res.status(500).json({ error: "Internal server error" });
-        }
+      registerConfigRoutes({
+        router: addonRouter,
+        routePath,
+        decryptConfig,
+        isValidEncryptedFormat,
       });
 
       // Add endpoint to set query counter
