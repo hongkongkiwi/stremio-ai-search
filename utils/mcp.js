@@ -1,14 +1,5 @@
 const logger = require("./logger");
-
-function parseJsonEnv(name, fallback) {
-  const raw = process.env[name];
-  if (!raw || !String(raw).trim()) return fallback;
-  return JSON.parse(raw);
-}
-
-function isTruthy(value) {
-  return String(value || "").toLowerCase() === "true";
-}
+const { parseJsonEnv, isTruthyValue, getDefaultAllowlistedEnv } = require("./env");
 
 function substituteTemplate(value, vars) {
   if (typeof value === "string") {
@@ -26,20 +17,11 @@ function substituteTemplate(value, vars) {
 }
 
 function isMcpEnabled() {
-  return isTruthy(process.env.MCP_ENABLED);
+  return isTruthyValue(process.env.MCP_ENABLED);
 }
 
 function isMcpSpawnAllowed() {
-  return isTruthy(process.env.MCP_ALLOW_SPAWN);
-}
-
-function getDefaultEnv() {
-  const allowlist = ["HOME", "LOGNAME", "PATH", "SHELL", "TERM", "USER"];
-  const env = {};
-  for (const key of allowlist) {
-    if (process.env[key] !== undefined) env[key] = process.env[key];
-  }
-  return env;
+  return isTruthyValue(process.env.MCP_ALLOW_SPAWN);
 }
 
 function normalizeServerConfig(raw, index) {
@@ -136,7 +118,7 @@ async function startMcpClient(server) {
   const transport = new StdioClientTransport({
     command: cmd,
     args,
-    env: server.env ? { ...getDefaultEnv(), ...server.env } : getDefaultEnv(),
+    env: server.env ? { ...getDefaultAllowlistedEnv(), ...server.env } : getDefaultAllowlistedEnv(),
     stderr: "inherit",
   });
 
