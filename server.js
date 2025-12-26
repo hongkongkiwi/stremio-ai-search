@@ -20,10 +20,7 @@ const { serveHTTP } = require("stremio-addon-sdk");
 const { addonInterface, catalogHandler, determineIntentFromKeywords } = require("./addon");
 const express = require("express");
 const compression = require("compression");
-const rateLimit = require("express-rate-limit");
-const { getNumberEnv, isTruthyValue } = require("./utils/env");
-const fs = require("fs");
-const path = require("path");
+const { applyAddonRateLimit } = require("./server/middleware/rateLimit");
 const logger = require("./utils/logger");
 const fetch = require("./utils/fetch");
 const { handleIssueSubmission } = require("./utils/issueHandler");
@@ -31,26 +28,30 @@ const {
   createAiTextGenerator,
   getAiProviderConfigFromConfig,
 } = require("./utils/aiProvider");
+const {
+  DEFAULT_ENABLE_HOMEPAGE,
+  DEFAULT_AI_TEMPERATURE,
+  DEFAULT_NUM_RESULTS,
+  DEFAULT_ENABLE_SIMILAR,
+} = require("./config/defaults");
 const { validateAiProvider, validateTmdbApiKey } = require("./utils/validate");
 const {
   encryptConfig,
   decryptConfig,
   isValidEncryptedFormat,
 } = require("./utils/crypto");
-const zlib = require("zlib");
 const { initDb, storeTokens, getTokens } = require("./database");
+const {
+  CACHE_BACKUP_INTERVAL_MS,
+  ensureCacheFolder,
+  saveCachesToFiles,
+  loadCachesFromFiles,
+} = require("./server/cachePersistence");
 
 // Admin token for cache management
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "change-me-in-env-file";
 
-// Cache persistence configuration
-const CACHE_BACKUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-const CACHE_FOLDER = path.join(__dirname, "cache_data");
-
-// Ensure cache folder exists
-if (!fs.existsSync(CACHE_FOLDER)) {
-  fs.mkdirSync(CACHE_FOLDER, { recursive: true });
-}
+ensureCacheFolder();
 
 // Function to validate admin token
 const validateAdminToken = (req, res, next) => {
@@ -64,203 +65,6 @@ const validateAdminToken = (req, res, next) => {
 
   next();
 };
-
-// Function to save all caches to files
-async function saveCachesToFiles() {
-  try {
-    const { serializeAllCaches } = require("./addon");
-    const allCaches = serializeAllCaches();
-    const savePromises = [];
-    const results = {};
-    for (const [cacheName, cacheData] of Object.entries(allCaches)) {
-      const cacheFilePath = path.join(CACHE_FOLDER, `${cacheName}.json.gz`);
-      const tempCacheFilePath = `${cacheFilePath}.${process.pid}.tmp`;
-      const promise = (async () => {
-        try {
-          const jsonData = JSON.stringify(cacheData);
-          const compressed = zlib.gzipSync(jsonData);
-          await fs.promises.writeFile(tempCacheFilePath, compressed);
-          await fs.promises.rename(tempCacheFilePath, cacheFilePath);
-          if (cacheName === "stats") {
-            results[cacheName] = {
-              success: true,
-              originalSize: jsonData.length,
-              compressedSize: compressed.length,
-              compressionRatio:
-                ((compressed.length / jsonData.length) * 100).toFixed(2) + "%",
-              path: cacheFilePath,
-            };
-          } else {
-            results[cacheName] = {
-              success: true,
-              size: cacheData.entries ? cacheData.entries.length : 0,
-              originalSize: jsonData.length,
-              compressedSize: compressed.length,
-              compressionRatio:
-                ((compressed.length / jsonData.length) * 100).toFixed(2) + "%",
-              path: cacheFilePath,
-            };
-          }
-        } catch (err) {
-          logger.error(`Error saving ${cacheName} to file`, {
-            error: err.message,
-            stack: err.stack,
-          });
-          results[cacheName] = {
-            success: false,
-            error: err.message,
-          };
-          try {
-            if (fs.existsSync(tempCacheFilePath)) {
-              await fs.promises.unlink(tempCacheFilePath);
-            }
-          } catch (cleanupErr) {
-            logger.warn(
-              `Failed to delete temporary cache file: ${tempCacheFilePath}`,
-              {
-                error: cleanupErr.message,
-              }
-            );
-          }
-        }
-      })();
-      savePromises.push(promise);
-    }
-    await Promise.all(savePromises);
-    logger.info("Cache data saved to individual compressed files", {
-      timestamp: new Date().toISOString(),
-      cacheFolder: CACHE_FOLDER,
-      results,
-    });
-    return {
-      success: true,
-      timestamp: new Date().toISOString(),
-      cacheFolder: CACHE_FOLDER,
-      results,
-    };
-  } catch (error) {
-    logger.error("Error saving cache data to files", {
-      error: error.message,
-      stack: error.stack,
-    });
-    return {
-      success: false,
-      error: error.message,
-    };
-  }
-}
-
-// Function to load caches from files
-async function loadCachesFromFiles() {
-  try {
-    // Check if cache folder exists
-    if (!fs.existsSync(CACHE_FOLDER)) {
-      logger.info("No cache folder found, starting with empty caches", {
-        cacheFolder: CACHE_FOLDER,
-      });
-      return {
-        success: false,
-        reason: "No cache folder found",
-      };
-    }
-
-    // Get all cache files (both compressed and uncompressed for backward compatibility)
-    const files = fs
-      .readdirSync(CACHE_FOLDER)
-      .filter((file) => file.endsWith(".json.gz") || file.endsWith(".json"));
-
-    if (files.length === 0) {
-      logger.info("No cache files found, starting with empty caches", {
-        cacheFolder: CACHE_FOLDER,
-      });
-      return {
-        success: false,
-        reason: "No cache files found",
-      };
-    }
-
-    // Create an object to hold all cache data
-    const allCacheData = {};
-    const results = {};
-
-    // Read each cache file
-    for (const file of files) {
-      try {
-        const isCompressed = file.endsWith(".json.gz");
-        const cacheName = path.basename(
-          file,
-          isCompressed ? ".json.gz" : ".json"
-        );
-        const cacheFilePath = path.join(CACHE_FOLDER, file);
-
-        // Read the file
-        const fileData = await fs.promises.readFile(cacheFilePath);
-
-        let cacheDataJson;
-        if (isCompressed) {
-          // Decompress the data
-          cacheDataJson = zlib.gunzipSync(fileData).toString();
-        } else {
-          // Handle uncompressed files for backward compatibility
-          cacheDataJson = fileData.toString("utf8");
-        }
-
-        const cacheData = JSON.parse(cacheDataJson);
-
-        allCacheData[cacheName] = cacheData;
-        results[cacheName] = {
-          success: true,
-          entriesCount:
-            cacheName === "stats" ? "N/A" : cacheData.entries?.length || 0,
-          compressed: isCompressed,
-          path: cacheFilePath,
-        };
-      } catch (err) {
-        logger.error(`Error reading cache file ${file}`, {
-          error: err.message,
-          stack: err.stack,
-        });
-        results[file] = {
-          success: false,
-          error: err.message,
-        };
-        // Continue with other files even if one fails
-        continue;
-      }
-    }
-
-    // Deserialize the caches
-    const { deserializeAllCaches } = require("./addon");
-    const deserializeResults = deserializeAllCaches(allCacheData);
-
-    // Combine results
-    for (const [cacheName, result] of Object.entries(deserializeResults)) {
-      if (results[cacheName]) {
-        results[cacheName].deserialized = result;
-      }
-    }
-
-    logger.info("Cache data loaded from individual files", {
-      timestamp: new Date().toISOString(),
-      results,
-    });
-
-    return {
-      success: true,
-      results,
-    };
-  } catch (error) {
-    logger.error("Error loading cache data from files", {
-      error: error.message,
-      stack: error.stack,
-    });
-
-    return {
-      success: false,
-      error: error.message,
-    };
-  }
-}
 
 async function refreshTraktToken(username, refreshToken) {
   logger.info(`Attempting to refresh Trakt token for user: ${username}`);
@@ -498,38 +302,7 @@ async function startServer() {
     });
 
     const addonRouter = require("express").Router();
-    const rateLimitEnabled =
-      process.env.RATE_LIMIT_ENABLED === undefined
-        ? true
-        : isTruthyValue(process.env.RATE_LIMIT_ENABLED);
-    if (rateLimitEnabled) {
-      const windowMs = getNumberEnv("RATE_LIMIT_WINDOW_MS", 60 * 1000);
-      const max = getNumberEnv("RATE_LIMIT_MAX", 120);
-      const trustLocal =
-        process.env.RATE_LIMIT_TRUST_LOCAL === undefined
-          ? true
-          : isTruthyValue(process.env.RATE_LIMIT_TRUST_LOCAL);
-
-      const isLocalRequest = (req) => {
-        const ip = req.ip || req.connection?.remoteAddress || "";
-        return (
-          ip === "127.0.0.1" ||
-          ip === "::1" ||
-          ip.startsWith("::ffff:127.") ||
-          ip === "::ffff:127.0.0.1"
-        );
-      };
-
-      const addonRateLimiter = rateLimit({
-        windowMs,
-        max,
-        standardHeaders: true,
-        legacyHeaders: false,
-        skip: (req) => trustLocal && isLocalRequest(req),
-        message: { error: "Too many requests, please slow down." },
-      });
-      addonRouter.use(addonRateLimiter);
-    }
+    applyAddonRateLimit(addonRouter);
     const routeHandlers = {
       manifest: (req, res, next) => {
         next();
@@ -581,7 +354,10 @@ async function startServer() {
             if (decryptedConfigStr) {
               try {
                 const configData = JSON.parse(decryptedConfigStr);
-                const enableHomepage = configData.EnableHomepage !== undefined ? configData.EnableHomepage : true;
+                const enableHomepage =
+                  configData.EnableHomepage !== undefined
+                    ? configData.EnableHomepage
+                    : DEFAULT_ENABLE_HOMEPAGE;
                 let homepageQueries = configData.HomepageQuery;
 
                 if (enableHomepage) {
@@ -1426,11 +1202,23 @@ async function startServer() {
 
     app.post(["/encrypt", "/aisearch/encrypt"], express.json(), async (req, res) => {
       try {
-        const { configData, traktAuthData } = req.body;
-        if (!configData) {
-          return res.status(400).json({ error: "Missing config data" });
-        }
+          const { configData, traktAuthData } = req.body;
+          if (!configData) {
+            return res.status(400).json({ error: "Missing config data" });
+          }
 
+          if (configData.AiTemperature === undefined) {
+            configData.AiTemperature = DEFAULT_AI_TEMPERATURE;
+          }
+          if (configData.NumResults === undefined) {
+            configData.NumResults = DEFAULT_NUM_RESULTS;
+          }
+          if (configData.EnableHomepage === undefined) {
+            configData.EnableHomepage = DEFAULT_ENABLE_HOMEPAGE;
+          }
+          if (configData.EnableSimilar === undefined) {
+            configData.EnableSimilar = DEFAULT_ENABLE_SIMILAR;
+          }
         // If Trakt data is present, store it in the database
         if (traktAuthData && traktAuthData.username) {
           await storeTokens(

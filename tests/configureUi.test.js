@@ -5,12 +5,19 @@ const { JSDOM } = require("jsdom");
 
 function loadConfigureHtml() {
   const htmlPath = path.join(process.cwd(), "public", "configure.html");
+  const jsPath = path.join(process.cwd(), "public", "configure.js");
   let html = fs.readFileSync(htmlPath, "utf8");
+  const scriptContent = fs.readFileSync(jsPath, "utf8");
 
   // Prevent external network/script loads (recaptcha) during tests.
   html = html.replace(
     /<script[^>]+src="https:\/\/www\.google\.com\/recaptcha\/api\.js[^"]*"[^>]*><\/script>/g,
     ""
+  );
+  // Inline configure.js to avoid external resource loading.
+  html = html.replace(
+    /<script[^>]+src="configure\.js"[^>]*><\/script>/g,
+    `<script>${scriptContent}</script>`
   );
 
   const dom = new JSDOM(html, {
