@@ -5,6 +5,7 @@ const logger = require("./utils/logger");
 const path = require("path");
 const { decryptConfig } = require("./utils/crypto");
 const { withRetry } = require("./utils/apiRetry");
+const { getNumberEnv } = require("./utils/env");
 const {
   createAiTextGenerator,
   getAiProviderConfigFromConfig,
@@ -15,16 +16,22 @@ const TMDB_API_BASE =
     /\/+$/,
     ""
   );
-const TMDB_CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 day cache for TMDB
-const TMDB_DISCOVER_CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 day cache for TMDB discover (was 12 hours)
-const AI_CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 day cache for AI
-const RPDB_CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 day cache for RPDB
+const TMDB_CACHE_DURATION = getNumberEnv("TMDB_CACHE_TTL_MS", 7 * 24 * 60 * 60 * 1000);
+const TMDB_DISCOVER_CACHE_DURATION = getNumberEnv(
+  "TMDB_DISCOVER_CACHE_TTL_MS",
+  7 * 24 * 60 * 60 * 1000
+);
+const AI_CACHE_DURATION = getNumberEnv("AI_CACHE_TTL_MS", 7 * 24 * 60 * 60 * 1000);
+const RPDB_CACHE_DURATION = getNumberEnv("RPDB_CACHE_TTL_MS", 7 * 24 * 60 * 60 * 1000);
 const DEFAULT_RPDB_KEY = process.env.RPDB_API_KEY;
 const DEFAULT_FANART_KEY = process.env.FANART_API_KEY;
 const ENABLE_LOGGING = process.env.ENABLE_LOGGING === "true" || false;
 const TRAKT_API_BASE = "https://api.trakt.tv";
-const TRAKT_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-const TRAKT_RAW_DATA_CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
+const TRAKT_CACHE_DURATION = getNumberEnv("TRAKT_CACHE_TTL_MS", 24 * 60 * 60 * 1000);
+const TRAKT_RAW_DATA_CACHE_DURATION = getNumberEnv(
+  "TRAKT_RAW_CACHE_TTL_MS",
+  7 * 24 * 60 * 60 * 1000
+);
 const DEFAULT_TRAKT_CLIENT_ID = process.env.TRAKT_CLIENT_ID;
 const MAX_AI_RECOMMENDATIONS = 30;
 
@@ -162,33 +169,33 @@ class SimpleLRUCache {
 }
 
 const tmdbCache = new SimpleLRUCache({
-  max: 25000,
+  max: getNumberEnv("TMDB_CACHE_MAX", 25000),
   ttl: TMDB_CACHE_DURATION,
 });
 
 // Add a separate cache for TMDB details to avoid redundant API calls
 const tmdbDetailsCache = new SimpleLRUCache({
-  max: 25000,
+  max: getNumberEnv("TMDB_DETAILS_CACHE_MAX", 25000),
   ttl: TMDB_CACHE_DURATION,
 });
 
 const aiRecommendationsCache = new SimpleLRUCache({
-  max: 25000,
+  max: getNumberEnv("AI_CACHE_MAX", 25000),
   ttl: AI_CACHE_DURATION,
 });
 
 const rpdbCache = new SimpleLRUCache({
-  max: 25000,
+  max: getNumberEnv("RPDB_CACHE_MAX", 25000),
   ttl: RPDB_CACHE_DURATION,
 });
 
 const fanartCache = new SimpleLRUCache({
-  max: 5000,
+  max: getNumberEnv("FANART_CACHE_MAX", 5000),
   ttl: RPDB_CACHE_DURATION,
 });
 
 const similarContentCache = new SimpleLRUCache({
-  max: 5000,
+  max: getNumberEnv("SIMILAR_CACHE_MAX", 5000),
   ttl: AI_CACHE_DURATION,
 });
 

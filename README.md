@@ -47,6 +47,18 @@ pnpm test
 To force the legacy (non-TanStack) HTTP clients for local testing:
 `AI_USE_TANSTACK=false`
 
+### Cache tuning (optional)
+
+You can override cache sizes and TTLs via environment variables:
+- `AI_CACHE_TTL_MS`, `AI_CACHE_MAX`
+- `TMDB_CACHE_TTL_MS`, `TMDB_CACHE_MAX`
+- `TMDB_DISCOVER_CACHE_TTL_MS`
+- `TMDB_DETAILS_CACHE_MAX`
+- `RPDB_CACHE_TTL_MS`, `RPDB_CACHE_MAX`
+- `FANART_CACHE_MAX`
+- `SIMILAR_CACHE_MAX`
+- `TRAKT_CACHE_TTL_MS`, `TRAKT_RAW_CACHE_TTL_MS`
+
 ## AI Provider Setup
 
 In the configuration page you can choose an AI provider:

@@ -1,7 +1,8 @@
 const fetch = require("./fetch");
 const path = require("path");
 const { pathToFileURL } = require("url");
-const { isTruthyValue } = require("./env");
+const { isTruthyValue, getNumberEnv } = require("./env");
+const { withRetry } = require("./apiRetry");
 
 function normalizeProviderName(provider) {
   if (!provider) return null;
@@ -180,25 +181,36 @@ async function generateWithTanstackAi({
     return String(stream || "").trim();
   };
 
-  if (typeof timeoutMs === "number" && timeoutMs > 0) {
-    let timeoutId;
-    try {
-      return await Promise.race([
-        run(),
-        new Promise((_, reject) => {
-          timeoutId = setTimeout(() => {
-            const err = new Error(`TanStack AI request timed out after ${timeoutMs}ms`);
-            err.status = 504;
-            reject(err);
-          }, timeoutMs);
-        }),
-      ]);
-    } finally {
-      clearTimeout(timeoutId);
+  const execWithTimeout = async () => {
+    if (typeof timeoutMs === "number" && timeoutMs > 0) {
+      let timeoutId;
+      try {
+        return await Promise.race([
+          run(),
+          new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+              const err = new Error(`TanStack AI request timed out after ${timeoutMs}ms`);
+              err.status = 504;
+              reject(err);
+            }, timeoutMs);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timeoutId);
+      }
     }
-  }
+    return run();
+  };
 
-  return run();
+  const retryOptions = {
+    maxRetries: getNumberEnv("AI_RETRY_ATTEMPTS", 2),
+    initialDelay: getNumberEnv("AI_RETRY_BASE_MS", 300),
+    maxDelay: getNumberEnv("AI_RETRY_MAX_MS", 2000),
+    shouldRetry: (error) => !error.status || error.status >= 500 || error.status === 429,
+    operationName: "TanStack AI call",
+  };
+
+  return withRetry(execWithTimeout, retryOptions);
 }
 
 function getAiProviderConfigFromConfig(configData = {}) {
@@ -370,26 +382,36 @@ function createAiTextGenerator(aiProviderConfig) {
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         const url = getOpenAIChatCompletionsUrl(aiProviderConfig.baseUrl);
+        const retryOptions = {
+          maxRetries: getNumberEnv("AI_RETRY_ATTEMPTS", 2),
+          initialDelay: getNumberEnv("AI_RETRY_BASE_MS", 300),
+          maxDelay: getNumberEnv("AI_RETRY_MAX_MS", 2000),
+          shouldRetry: (error) => !error.status || error.status >= 500 || error.status === 429,
+          operationName: "OpenAI-compatible call",
+        };
+
         let response;
         try {
-          response = await fetch(url, {
-            method: "POST",
-            signal: controller.signal,
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${aiProviderConfig.apiKey}`,
-              ...buildExtraHeaders(extraHeadersObj),
-            },
-            body: JSON.stringify({
-              model: aiProviderConfig.model,
-              messages: [{ role: "user", content: prompt }],
-              temperature:
-                typeof aiProviderConfig.temperature === "number"
-                  ? aiProviderConfig.temperature
-                  : 0.2,
-              max_tokens: 800,
-            }),
-          });
+          response = await withRetry(async () => {
+            return await fetch(url, {
+              method: "POST",
+              signal: controller.signal,
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${aiProviderConfig.apiKey}`,
+                ...buildExtraHeaders(extraHeadersObj),
+              },
+              body: JSON.stringify({
+                model: aiProviderConfig.model,
+                messages: [{ role: "user", content: prompt }],
+                temperature:
+                  typeof aiProviderConfig.temperature === "number"
+                    ? aiProviderConfig.temperature
+                    : 0.2,
+                max_tokens: 800,
+              }),
+            });
+          }, retryOptions);
         } catch (error) {
           if (error && error.name === "AbortError") {
             const timeoutError = new Error(

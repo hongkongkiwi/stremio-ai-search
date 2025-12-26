@@ -8,6 +8,13 @@ function isTruthyValue(value) {
   return String(value || "").toLowerCase() === "true";
 }
 
+function getNumberEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === null || raw === "") return fallback;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : fallback;
+}
+
 function getDefaultAllowlistedEnv() {
   const allowlist = [
     "HOME",
@@ -33,4 +40,5 @@ module.exports = {
   parseJsonEnv,
   isTruthyValue,
   getDefaultAllowlistedEnv,
+  getNumberEnv,
 };

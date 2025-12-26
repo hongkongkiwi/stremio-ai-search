@@ -244,25 +244,27 @@ async function testOpenAICompatExtraHeadersMustBeObject() {
 
 async function testOpenAICompatTimeoutAbort() {
   await withEnv("AI_USE_TANSTACK", "false", async () => {
-    const { fetch, calls } = createAbortAwareHangingFetch();
-    const aiProvider = freshRequireAiProviderWithFetch(fetch);
+    await withEnv("AI_RETRY_ATTEMPTS", "0", async () => {
+      const { fetch, calls } = createAbortAwareHangingFetch();
+      const aiProvider = freshRequireAiProviderWithFetch(fetch);
 
-    const config = aiProvider.getAiProviderConfigFromConfig({
-      AiProvider: "openai-compat",
-      OpenAICompatApiKey: "sk-test",
-      OpenAICompatBaseUrl: "https://api.openai.com",
-      OpenAICompatModel: "gpt-4o-mini",
-      OpenAICompatTimeoutMs: 5,
+      const config = aiProvider.getAiProviderConfigFromConfig({
+        AiProvider: "openai-compat",
+        OpenAICompatApiKey: "sk-test",
+        OpenAICompatBaseUrl: "https://api.openai.com",
+        OpenAICompatModel: "gpt-4o-mini",
+        OpenAICompatTimeoutMs: 5,
+      });
+
+      const client = aiProvider.createAiTextGenerator(config);
+      await assert.rejects(
+        () => client.generateText("hello"),
+        (err) => err && err.status === 504
+      );
+
+      assert.equal(calls.length, 1);
+      assert.ok(calls[0].options.signal, "fetch called with an AbortSignal");
     });
-
-    const client = aiProvider.createAiTextGenerator(config);
-    await assert.rejects(
-      () => client.generateText("hello"),
-      (err) => err && err.status === 504
-    );
-
-    assert.equal(calls.length, 1);
-    assert.ok(calls[0].options.signal, "fetch called with an AbortSignal");
   });
 }
 

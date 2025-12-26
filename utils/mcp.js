@@ -1,5 +1,6 @@
 const logger = require("./logger");
-const { parseJsonEnv, isTruthyValue, getDefaultAllowlistedEnv } = require("./env");
+const { parseJsonEnv, isTruthyValue, getDefaultAllowlistedEnv, getNumberEnv } = require("./env");
+const { withRetry } = require("./apiRetry");
 
 function substituteTemplate(value, vars) {
   if (typeof value === "string") {
@@ -174,10 +175,21 @@ async function getMcpContext(vars, options = {}) {
     (async (server, name, renderedArgs) => {
       const mcp = await getMcp(server);
       if (!mcp) throw new Error("MCP client unavailable");
-      return await withTimeout(
-        mcp.client.callTool({ name, arguments: renderedArgs }),
-        mcp.timeoutMs,
-        `MCP tool call timed out: ${server.id}:${name}`
+      const retryOptions = {
+        maxRetries: getNumberEnv("MCP_RETRY_ATTEMPTS", 2),
+        initialDelay: getNumberEnv("MCP_RETRY_BASE_MS", 300),
+        maxDelay: getNumberEnv("MCP_RETRY_MAX_MS", 2000),
+        shouldRetry: (error) => !error.status || error.status >= 500 || error.status === 429,
+        operationName: `MCP tool ${server.id}:${name}`,
+      };
+      return await withRetry(
+        () =>
+          withTimeout(
+            mcp.client.callTool({ name, arguments: renderedArgs }),
+            mcp.timeoutMs,
+            `MCP tool call timed out: ${server.id}:${name}`
+          ),
+        retryOptions
       );
     });
 
